@@ -1,0 +1,112 @@
+{% extends 'attendance/base.html' %}
+{% block content %}
+<h2>QR Code Check-In</h2>
+<div class="row">
+    <div class="col-md-6">
+        <video id="video" width="400" height="300" autoplay class="border"></video>
+        <canvas id="canvas" style="display: none;"></canvas>
+        <p id="status">Scanning...</p>
+    </div>
+    <div class="col-md-6">
+        <h4>Manual Check-In (if QR scan fails)</h4>
+        <form id="manual-checkin-form">
+            {% csrf_token %}
+            <div class="form-group">
+                <label for="student_id">Student ID</label>
+                <input type="text" id="student_id" name="student_id" class="form-control" placeholder="e.g., S12345" required>
+            </div>
+            <button type="submit" class="btn btn-secondary">Check In</button>
+        </form>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+<script>
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const status = document.getElementById('status');
+    const manualForm = document.getElementById('manual-checkin-form');
+
+    // Function to start scanning once video is ready
+    function startScanning() {
+        if (video.readyState === video.HAVE_ENOUGH_DATA && video.videoWidth > 0 && video.videoHeight > 0) {
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            scanQRCode();
+        } else {
+            setTimeout(startScanning, 100);
+        }
+    }
+
+    // QR code scanning function
+    function scanQRCode() {
+        if (video.videoWidth === 0 || video.videoHeight === 0) {
+            status.textContent = 'Video feed not available. Please check your webcam or use manual check-in.';
+            return;
+        }
+
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const code = jsQR(imageData.data, imageData.width, imageData.height);
+
+        if (code) {
+            status.textContent = 'QR code detected, processing...';
+            checkIn(code.data);
+        } else {
+            requestAnimationFrame(scanQRCode);
+        }
+    }
+
+    // Function to handle check-in (used by both QR and manual)
+    function checkIn(studentId) {
+        fetch('/qr-check-in/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: JSON.stringify({ student_id: studentId })
+        })
+        .then(response => response.json())
+        .then(data => {
+            status.textContent = data.message;
+            if (data.status === 'success') {
+                setTimeout(() => location.reload(), 2000);
+            } else {
+                requestAnimationFrame(scanQRCode); // Resume scanning
+            }
+        })
+        .catch(err => {
+            status.textContent = 'Error: ' + err;
+            requestAnimationFrame(scanQRCode);
+        });
+    }
+
+    // Access webcam
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+        .then(stream => {
+            video.srcObject = stream;
+            video.play();
+            status.textContent = 'Webcam initialized, please show your QR code.';
+            startScanning();
+        })
+        .catch(err => {
+            status.textContent = 'Error accessing webcam: ' + err.message + '. Use manual check-in below.';
+            console.error(err);
+            video.style.display = 'none'; // Hide video if webcam fails
+        });
+
+    // Manual check-in form submission
+    manualForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const studentId = document.getElementById('student_id').value.trim();
+        if (studentId) {
+            status.textContent = 'Processing manual check-in...';
+            checkIn(studentId);
+        } else {
+            status.textContent = 'Please enter a student ID.';
+        }
+    });
+</script>
+{% endblock %}

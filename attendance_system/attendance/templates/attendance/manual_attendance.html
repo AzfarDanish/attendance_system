@@ -1,0 +1,33 @@
+{% extends 'attendance/base.html' %}
+{% block content %}
+<h2>Manual Attendance Entry</h2>
+<form method="post">
+    {% csrf_token %}
+    <div class="form-group">
+        <label for="student_id">Student</label>
+        <select name="student_id" class="form-control" required>
+            <option value="">Select a student</option>
+            {% for student in students %}
+                <option value="{{ student.id }}">{{ student.name }} ({{ student.id }})</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="form-group">
+        <label for="status">Status</label>
+        <select name="status" class="form-control" required>
+            <option value="on-time">On Time</option>
+            <option value="late">Late</option>
+            <option value="absent">Absent</option>
+        </select>
+    </div>
+    <div class="form-group">
+        <label for="notes">Notes (optional)</label>
+        <textarea name="notes" class="form-control"></textarea>
+    </div>
+    <div class="form-group">
+        <label for="date">Date (optional, defaults to today)</label>
+        <input type="date" name="date" class="form-control">
+    </div>
+    <button type="submit" class="btn btn-primary">Record Attendance</button>
+</form>
+{% endblock %}
