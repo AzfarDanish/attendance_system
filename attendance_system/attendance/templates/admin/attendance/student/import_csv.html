@@ -1,0 +1,17 @@
+{% extends "admin/base_site.html" %}
+{% block content %}
+<h1>Import Students from CSV</h1>
+<p>Upload a CSV file with columns: <code>name</code>, <code>class_name</code>.</p>
+<p>Example:</p>
+<pre>
+name,class_name
+John Doe,Tingkatan 4 STEM
+Jane Smith,Tingkatan 5 ES
+</pre>
+<form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit" class="button">Upload CSV</button>
+</form>
+<a href="{% url 'admin:attendance_student_changelist' %}" class="button">Back to Students</a>
+{% endblock %}

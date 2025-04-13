@@ -1,0 +1,56 @@
+{% extends "admin/base_site.html" %}
+{% block content %}
+<h1>Preview Student Import</h1>
+<p><strong>Summary:</strong> {{ valid_count }} students will be added, {{ error_count }} errors found.</p>
+
+{% if valid_rows %}
+<h2>Valid Students ({{ valid_count }})</h2>
+<table class="table">
+    <thead>
+        <tr>
+            <th>Student ID</th>
+            <th>Name</th>
+            <th>Class Name</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for row in valid_rows %}
+        <tr>
+            <td>{{ row.student_id }}</td>
+            <td>{{ row.name }}</td>
+            <td>{{ row.class_name }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+<form method="post" action="{% url 'admin:attendance_student_confirm_import' %}">
+    {% csrf_token %}
+    <button type="submit" class="button">Confirm Import</button>
+</form>
+{% endif %}
+
+{% if errors %}
+<h2>Errors ({{ error_count }})</h2>
+<table class="table">
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Class Name</th>
+            <th>Error</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for error in errors %}
+        <tr>
+            <td>{{ error.row.name|default:"(missing)" }}</td>
+            <td>{{ error.row.class_name|default:"(missing)" }}</td>
+            <td>{{ error.error }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endif %}
+
+<a href="{% url 'admin:attendance_student_import_csv' %}" class="button">Upload Another CSV</a>
+<a href="{% url 'admin:attendance_student_changelist' %}" class="button">Back to Students</a>
+{% endblock %}
