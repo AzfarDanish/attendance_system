@@ -1,158 +1,100 @@
-{% extends 'attendance/base.html' %}
-{% block content %}
-<div class="container mt-4">
-    <h2 class="text-center mb-4">QR Code Check-In</h2>
-    <div class="row">
-        <!-- Webcam Scanning -->
-        <div class="col-md-6">
-            <div class="card shadow-sm">
-                <div class="card-body">
-                    <h4 class="card-title">Scan QR Code</h4>
-                    <video id="video" class="img-fluid border rounded" autoplay></video>
-                    <canvas id="canvas" style="display: none;"></canvas>
-                    <div id="status" class="alert alert-info mt-3" role="alert">
-                        Initializing webcam...
-                    </div>
-                </div>
+{% extends 'attendance/dashboard_base.html' %}
+
+{% block dashboard_content %}
+<div class="container">
+    <h2 class="text-center mb-4">QR Check-In</h2>
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+        {% endfor %}
+    {% endif %}
+    <div class="card bg-light p-4 mx-auto" style="max-width: 500px;">
+        <div class="text-center mb-3 position-relative">
+            <video id="video" width="100%" height="auto" autoplay playsinline style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; border-radius: 5px;"></video>
+            <canvas id="canvas" style="display: none;"></canvas>
+            <div id="qr-overlay" style="position: relative; width: 100%; padding-top: 75%; border: 2px solid #6c757d; border-radius: 5px; background: rgba(255, 255, 255, 0.3);">
+                <div style="position: absolute; top: 10%; left: 10%; width: 80%; height: 80%; border: 2px dashed #28a745; pointer-events: none;"></div>
+                <p id="scanning-text" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #6c757d; font-weight: 500;">Scanning for QR code...</p>
             </div>
         </div>
-        <!-- Manual Check-In -->
-        <div class="col-md-6">
-            <div class="card shadow-sm">
-                <div class="card-body">
-                    <h4 class="card-title">Manual Check-In</h4>
-                    <form id="manual-checkin-form">
-                        {% csrf_token %}
-                        <div class="mb-3">
-                            <label for="student_id" class="form-label">Student ID</label>
-                            <input type="text" id="student_id" name="student_id" class="form-control" placeholder="e.g., S00001" required>
-                        </div>
-                        <button type="submit" class="btn btn-primary w-100">Check In</button>
-                    </form>
-                </div>
+        <form method="post" id="qr-form">
+            {% csrf_token %}
+            <input type="hidden" name="student_id" id="student_id">
+            <div class="form-group">
+                <label for="manual_student_id">Manual Entry (if camera fails)</label>
+                <input type="text" name="student_id" id="manual_student_id" class="form-control" placeholder="e.g., S00001">
             </div>
-        </div>
+            <div class="text-center">
+                <button type="submit" class="btn btn-light">
+                    <i class="fas fa-qrcode mr-1"></i> Check In Manually
+                </button>
+            </div>
+        </form>
     </div>
 </div>
+{% endblock %}
 
-<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+{% block additional_js %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js"></script>
 <script>
     const video = document.getElementById('video');
-    const canvas = document.getElementById('canvas');
-    const ctx = canvas.getContext('2d');
-    const status = document.getElementById('status');
-    const manualForm = document.getElementById('manual-checkin-form');
+    const canvasElement = document.getElementById('canvas');
+    const canvas = canvasElement.getContext('2d');
+    const scanningText = document.getElementById('scanning-text');
+    const qrOverlay = document.getElementById('qr-overlay');
+    const qrForm = document.getElementById('qr-form');
+    const studentIdInput = document.getElementById('student_id');
 
-    // Function to start scanning
-    function startScanning() {
-        if (video.readyState === video.HAVE_ENOUGH_DATA && video.videoWidth > 0 && video.videoHeight > 0) {
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            scanQRCode();
-        } else {
-            setTimeout(startScanning, 100);
-        }
-    }
-
-    // QR code scanning function
-    function scanQRCode() {
-        if (video.videoWidth === 0 || video.videoHeight === 0) {
-            updateStatus('danger', 'Video feed unavailable. Please check your webcam.');
-            return;
-        }
-
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        try {
-            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-            const code = jsQR(imageData.data, imageData.width, imageData.height);
-
-            if (code) {
-                checkIn(code.data, true);
-            } else {
-                requestAnimationFrame(scanQRCode);
-            }
-        } catch (e) {
-            updateStatus('danger', 'Error scanning QR code: ' + e.message);
-            setTimeout(() => requestAnimationFrame(scanQRCode), 2000);
-        }
-    }
-
-    // Function to handle check-in (QR or manual)
-    function checkIn(studentId, isQR) {
-        updateStatus('info', 'Processing check-in for ' + studentId + '...');
-        fetch('/qr-check-in/', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': '{{ csrf_token }}'
-            },
-            body: JSON.stringify({ student_id: studentId })
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.status === 'success') {
-                updateStatus('success', data.message);
-                if (isQR) {
-                    // Resume scanning after 3 seconds for QR scans
-                    setTimeout(() => {
-                        updateStatus('info', 'Ready to scan next QR code.');
-                        requestAnimationFrame(scanQRCode);
-                    }, 3000);
-                } else {
-                    // Clear manual form
-                    manualForm.reset();
-                    updateStatus('info', 'Ready for next check-in.');
-                }
-            } else {
-                updateStatus('danger', data.message);
-                if (isQR) {
-                    // Resume scanning after 3 seconds
-                    setTimeout(() => {
-                        updateStatus('info', 'Ready to scan next QR code.');
-                        requestAnimationFrame(scanQRCode);
-                    }, 3000);
-                }
-            }
-        })
-        .catch(err => {
-            updateStatus('danger', 'Network error: ' + err.message);
-            if (isQR) {
-                setTimeout(() => {
-                    updateStatus('info', 'Ready to scan next QR code.');
-                    requestAnimationFrame(scanQRCode);
-                }, 3000);
-            }
-        });
-    }
-
-    // Update status with Bootstrap alert classes
-    function updateStatus(type, message) {
-        status.className = `alert alert-${type} mt-3`;
-        status.textContent = message;
-    }
-
-    // Access webcam
+    // Access the camera
     navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
         .then(stream => {
+            console.log('Camera access granted');
             video.srcObject = stream;
+            video.setAttribute('playsinline', true);
             video.play();
-            updateStatus('info', 'Webcam ready. Please show a QR code.');
-            startScanning();
+            // Set the video dimensions to match the overlay
+            video.addEventListener('loadedmetadata', () => {
+                const aspectRatio = video.videoWidth / video.videoHeight;
+                const overlayWidth = qrOverlay.offsetWidth;
+                qrOverlay.style.height = `${overlayWidth / aspectRatio}px`;
+                console.log('Video dimensions:', video.videoWidth, video.videoHeight);
+            });
+            requestAnimationFrame(tick);
         })
         .catch(err => {
-            updateStatus('danger', 'Cannot access webcam: ' + err.message + '. Use manual check-in.');
-            video.style.display = 'none';
+            console.error('Error accessing camera:', err);
+            scanningText.textContent = 'Camera access denied. Please use manual entry.';
         });
 
-    // Manual check-in form submission
-    manualForm.addEventListener('submit', (e) => {
-        e.preventDefault();
-        const studentId = document.getElementById('student_id').value.trim();
-        if (studentId) {
-            checkIn(studentId, false);
+    function tick() {
+        if (video.readyState === video.HAVE_ENOUGH_DATA) {
+            // Set canvas dimensions to match video
+            canvasElement.height = video.videoHeight;
+            canvasElement.width = video.videoWidth;
+            // Draw the video frame to the canvas
+            canvas.drawImage(video, 0, 0, canvasElement.width, canvasElement.height);
+            const imageData = canvas.getImageData(0, 0, canvasElement.width, canvasElement.height);
+            // Scan for QR code
+            const code = jsQR(imageData.data, imageData.width, imageData.height, {
+                inversionAttempts: 'dontInvert',
+            });
+
+            if (code) {
+                console.log('QR code detected:', code.data);
+                studentIdInput.value = code.data;
+                qrForm.submit();
+            } else {
+                console.log('No QR code detected in this frame');
+            }
         } else {
-            updateStatus('danger', 'Please enter a student ID.');
+            console.log('Video not ready:', video.readyState);
         }
-    });
+        requestAnimationFrame(tick);
+    }
 </script>
 {% endblock %}

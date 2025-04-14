@@ -9,8 +9,8 @@
             <li><a href="{% url 'student_list' %}">Student Management</a></li>
             <li><a href="{% url 'class_list' %}">Classes</a></li>
             <li><a href="{% url 'attendance_log_list' %}">Attendance Logs</a></li>
-            <li><a href="/qr-check-in/">QR Check-In</a></li>
-            <li><a href="/admin/attendance/adminactionlog/">Admin Logs</a></li>
+            <li><a href="{% url 'qr_check_in' %}">QR Check-In</a></li>
+            <li><a href="{% url 'admin_log_list' %}">Admin Logs</a></li>
         </ul>
     </div>
     <!-- Main Content -->
@@ -76,6 +76,10 @@
 
     #toggle-sidebar {
         font-size: 1.2rem;
+    }
+    video, canvas {
+        border: none !important;
+        outline: none !important;
     }
 </style>
 {% endblock %}

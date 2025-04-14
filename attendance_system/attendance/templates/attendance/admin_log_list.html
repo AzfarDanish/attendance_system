@@ -1,0 +1,29 @@
+{% extends 'attendance/dashboard_base.html' %}
+
+{% block dashboard_content %}
+<div class="container">
+    <h2 class="text-center mb-4">Admin Logs</h2>
+    {% if admin_logs %}
+        <table class="table table-bordered table-hover">
+            <thead class="thead-light">
+                <tr>
+                    <th>Admin</th>
+                    <th>Action</th>
+                    <th>Timestamp</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for log in admin_logs %}
+                    <tr>
+                        <td>{{ log.admin.username }}</td>
+                        <td>{{ log.action }}</td>
+                        <td>{{ log.timestamp }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p class="text-center">No admin logs found.</p>
+    {% endif %}
+</div>
+{% endblock %}

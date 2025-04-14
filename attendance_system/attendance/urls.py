@@ -13,4 +13,5 @@ urlpatterns = [
     path('classes/delete/<int:class_id>/', views.class_delete, name='class_delete'),
     path('attendance-logs/', views.attendance_log_list, name='attendance_log_list'),
     path('qr-check-in/', views.qr_check_in, name='qr_check_in'),
+    path('admin-logs/', views.admin_log_list, name='admin_log_list'),
 ]

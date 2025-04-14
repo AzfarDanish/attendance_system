@@ -213,14 +213,7 @@ def class_delete(request, class_id):
     }
     return render(request, 'attendance/class_confirm_delete.html', context)
 
-# QR Check-In View (placeholder, to be added later if not present)
-@login_required
-def qr_check_in(request):
-    context = {
-        'admin_name': request.user.get_full_name() or request.user.username,
-    }
-    return render(request, 'attendance/qr_check_in.html', context)
-
+# Attendance Logs View
 @login_required
 @user_passes_test(is_staff_or_superuser)
 def attendance_log_list(request):
@@ -230,6 +223,55 @@ def attendance_log_list(request):
         'attendance_logs': attendance_logs,
     }
     return render(request, 'attendance/attendance_log_list.html', context)
+
+# QR Check-In View
+@login_required
+def qr_check_in(request):
+    if request.method == 'POST':
+        student_id = request.POST.get('student_id')
+        try:
+            student = Student.objects.get(id=student_id)
+            # Check if the student has already checked in today
+            today = timezone.now().date()
+            existing_check_in = Attendance.objects.filter(student=student, date=today).first()
+            if existing_check_in:
+                messages.error(request, f'{student.name} has already checked in today.')
+            else:
+                # Determine status based on time (e.g., late if after 8 AM)
+                now = timezone.now()
+                check_in_time = now.time()
+                late_threshold = timezone.datetime.strptime('08:00', '%H:%M').time()
+                status = 'late' if check_in_time > late_threshold else 'on-time'
+                # Log attendance
+                Attendance.objects.create(
+                    student=student,
+                    date=today,
+                    check_in_time=check_in_time,
+                    status=status
+                )
+                messages.success(request, f'Check-in successful for {student.name} at {check_in_time}. Status: {status}.')
+        except Student.DoesNotExist:
+            messages.error(request, 'Student not found. Please check the ID.')
+        context = {
+            'admin_name': request.user.get_full_name() or request.user.username,
+        }
+        return render(request, 'attendance/qr_check_in.html', context)
+
+    context = {
+        'admin_name': request.user.get_full_name() or request.user.username,
+    }
+    return render(request, 'attendance/qr_check_in.html', context)
+
+# Admin Logs View
+@login_required
+@user_passes_test(is_staff_or_superuser)
+def admin_log_list(request):
+    admin_logs = AdminActionLog.objects.all().select_related('admin')
+    context = {
+        'admin_name': request.user.get_full_name() or request.user.username,
+        'admin_logs': admin_logs,
+    }
+    return render(request, 'attendance/admin_log_list.html', context)
 
 # Manual Attendance Entry View (Admin Only)
 @login_required
