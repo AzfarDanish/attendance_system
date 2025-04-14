@@ -1,0 +1,166 @@
+{% extends 'attendance/dashboard_base.html' %}
+
+{% block dashboard_content %}
+<div class="row">
+    <!-- Total Students Card -->
+    <div class="col-md-3">
+        <div class="card bg-light">
+            <div class="card-body text-center">
+                <i class="fas fa-users fa-2x text-primary"></i>
+                <h5 class="card-title mt-2">Total Students</h5>
+                <h3 class="card-text">{{ total_students }}</h3>
+            </div>
+        </div>
+    </div>
+    <!-- Today's Check-Ins Card -->
+    <div class="col-md-3">
+        <div class="card bg-light">
+            <div class="card-body text-center">
+                <i class="fas fa-check-circle fa-2x text-success"></i>
+                <h5 class="card-title mt-2">Today's Check-Ins</h5>
+                <h3 class="card-text">{{ today_check_ins }}</h3>
+            </div>
+        </div>
+    </div>
+    <!-- Late Check-Ins Card -->
+    <div class="col-md-3">
+        <div class="card bg-light">
+            <div class="card-body text-center">
+                <i class="fas fa-clock fa-2x {% if late_check_ins > 0 %}text-danger{% else %}text-success{% endif %}"></i>
+                <h5 class="card-title mt-2">Late Check-Ins</h5>
+                <h3 class="card-text">{{ late_check_ins }}</h3>
+            </div>
+        </div>
+    </div>
+    <!-- Total Classes Card -->
+    <div class="col-md-3">
+        <div class="card bg-light">
+            <div class="card-body text-center">
+                <i class="fas fa-school fa-2x text-info"></i>
+                <h5 class="card-title mt-2">Total Classes</h5>
+                <h3 class="card-text">{{ total_classes }}</h3>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Charts -->
+<div class="row mt-4">
+    <!-- Daily Attendance Trend (Line Chart) -->
+    <div class="col-md-6">
+        <div class="card bg-light">
+            <div class="card-body">
+                <h5 class="card-title text-center">Daily Attendance Trend (Last 7 Days)</h5>
+                <canvas id="dailyAttendanceChart"></canvas>
+            </div>
+        </div>
+    </div>
+    <!-- Late vs On-Time Check-Ins (Area Chart) -->
+    <div class="col-md-6">
+        <div class="card bg-light">
+            <div class="card-body">
+                <h5 class="card-title text-center">Late vs On-Time Check-Ins (Last 24 Hours)</h5>
+                <canvas id="checkInChart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- JSON Data for Charts -->
+{{ daily_attendance_labels|json_script:"daily-attendance-labels" }}
+{{ daily_attendance_data|json_script:"daily-attendance-data" }}
+{{ hourly_labels|json_script:"hourly-labels" }}
+{{ hourly_late_data|json_script:"hourly-late-data" }}
+{{ hourly_on_time_data|json_script:"hourly-on-time-data" }}
+{% endblock %}
+
+{% block additional_js %}
+<script>
+    // Parse JSON data
+    const dailyAttendanceLabels = JSON.parse(document.getElementById('daily-attendance-labels').textContent);
+    const dailyAttendanceData = JSON.parse(document.getElementById('daily-attendance-data').textContent);
+    const hourlyLabels = JSON.parse(document.getElementById('hourly-labels').textContent);
+    const hourlyLateData = JSON.parse(document.getElementById('hourly-late-data').textContent);
+    const hourlyOnTimeData = JSON.parse(document.getElementById('hourly-on-time-data').textContent);
+
+    // Daily Attendance Trend (Line Chart)
+    const dailyAttendanceCtx = document.getElementById('dailyAttendanceChart').getContext('2d');
+    new Chart(dailyAttendanceCtx, {
+        type: 'line',
+        data: {
+            labels: dailyAttendanceLabels,
+            datasets: [{
+                label: 'Attendance Count',
+                data: dailyAttendanceData,
+                borderColor: '#6c757d', // Gray
+                backgroundColor: 'rgba(108, 117, 125, 0.2)',
+                fill: true,
+                tension: 0.3
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Number of Check-Ins'
+                    }
+                },
+                x: {
+                    title: {
+                        display: true,
+                        text: 'Date'
+                    }
+                }
+            }
+        }
+    });
+
+    // Late vs On-Time Check-Ins (Area Chart)
+    const checkInCtx = document.getElementById('checkInChart').getContext('2d');
+    new Chart(checkInCtx, {
+        type: 'line',
+        data: {
+            labels: hourlyLabels,
+            datasets: [
+                {
+                    label: 'On-Time',
+                    data: hourlyOnTimeData,
+                    borderColor: '#28a745', // Green
+                    backgroundColor: 'rgba(40, 167, 69, 0.2)',
+                    fill: true,
+                    tension: 0.3
+                },
+                {
+                    label: 'Late',
+                    data: hourlyLateData,
+                    borderColor: '#dc3545', // Red
+                    backgroundColor: 'rgba(220, 53, 69, 0.2)',
+                    fill: true,
+                    tension: 0.3
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Number of Check-Ins'
+                    }
+                },
+                x: {
+                    title: {
+                        display: true,
+                        text: 'Hour'
+                    }
+                }
+            }
+        }
+    });
+</script>
+{% endblock %}

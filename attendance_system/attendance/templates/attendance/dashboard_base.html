@@ -1,0 +1,94 @@
+{% extends 'attendance/base.html' %}
+
+{% block content %}
+<div id="dashboard-wrapper">
+    <!-- Sidebar -->
+    <div id="sidebar" class="bg-light">
+        <ul class="list-unstyled">
+            <li><a href="{% url 'dashboard' %}">Dashboard</a></li>
+            <li><a href="/admin/attendance/student/">Student Management</a></li>
+            <li><a href="/admin/attendance/schoolclass/">Classes</a></li>
+            <li><a href="/admin/attendance/attendance/">Attendance Logs</a></li>
+            <li><a href="/qr-check-in/">QR Check-In</a></li>
+            <li><a href="/admin/attendance/adminactionlog/">Admin Logs</a></li>
+        </ul>
+    </div>
+    <!-- Main Content -->
+    <div id="main-content" class="ml-250">
+        <!-- Top Bar -->
+        <div id="top-bar" class="bg-white p-3 d-flex justify-content-between align-items-center">
+            <button id="toggle-sidebar" class="btn btn-light">
+                <i class="fas fa-bars"></i>
+            </button>
+            <span>Welcome, {{ admin_name }}</span>
+        </div>
+        <!-- Dashboard Content -->
+        <div class="p-4">
+            {% block dashboard_content %}
+            {% endblock %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+<style>
+    #sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 250px;
+        height: 100%;
+        background-color: #f8f9fa; /* Light gray */
+        padding: 20px;
+        transition: transform 0.3s ease;
+    }
+
+    #sidebar.collapsed {
+        transform: translateX(-250px);
+    }
+
+    #main-content {
+        margin-left: 250px;
+        transition: margin-left 0.3s ease;
+    }
+
+    #main-content.full-width {
+        margin-left: 0;
+    }
+
+    #sidebar a {
+        color: #6c757d; /* Gray */
+        text-decoration: none;
+        display: block;
+        padding: 10px;
+        border-radius: 5px;
+    }
+
+    #sidebar a:hover {
+        background-color: #e9ecef; /* Lighter gray */
+    }
+
+    #top-bar {
+        border-bottom: 1px solid #dee2e6;
+    }
+
+    #toggle-sidebar {
+        font-size: 1.2rem;
+    }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+<script>
+    $(document).ready(function() {
+        $('#toggle-sidebar').click(function() {
+            $('#sidebar').toggleClass('collapsed');
+            $('#main-content').toggleClass('full-width');
+        });
+    });
+</script>
+{% block additional_js %}{% endblock %}
+{% endblock %}

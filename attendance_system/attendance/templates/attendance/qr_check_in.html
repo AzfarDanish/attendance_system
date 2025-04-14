@@ -1,22 +1,37 @@
 {% extends 'attendance/base.html' %}
 {% block content %}
-<h2>QR Code Check-In</h2>
-<div class="row">
-    <div class="col-md-6">
-        <video id="video" width="400" height="300" autoplay class="border"></video>
-        <canvas id="canvas" style="display: none;"></canvas>
-        <p id="status">Scanning...</p>
-    </div>
-    <div class="col-md-6">
-        <h4>Manual Check-In (if QR scan fails)</h4>
-        <form id="manual-checkin-form">
-            {% csrf_token %}
-            <div class="form-group">
-                <label for="student_id">Student ID</label>
-                <input type="text" id="student_id" name="student_id" class="form-control" placeholder="e.g., S12345" required>
+<div class="container mt-4">
+    <h2 class="text-center mb-4">QR Code Check-In</h2>
+    <div class="row">
+        <!-- Webcam Scanning -->
+        <div class="col-md-6">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <h4 class="card-title">Scan QR Code</h4>
+                    <video id="video" class="img-fluid border rounded" autoplay></video>
+                    <canvas id="canvas" style="display: none;"></canvas>
+                    <div id="status" class="alert alert-info mt-3" role="alert">
+                        Initializing webcam...
+                    </div>
+                </div>
             </div>
-            <button type="submit" class="btn btn-secondary">Check In</button>
-        </form>
+        </div>
+        <!-- Manual Check-In -->
+        <div class="col-md-6">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <h4 class="card-title">Manual Check-In</h4>
+                    <form id="manual-checkin-form">
+                        {% csrf_token %}
+                        <div class="mb-3">
+                            <label for="student_id" class="form-label">Student ID</label>
+                            <input type="text" id="student_id" name="student_id" class="form-control" placeholder="e.g., S00001" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100">Check In</button>
+                    </form>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -28,7 +43,7 @@
     const status = document.getElementById('status');
     const manualForm = document.getElementById('manual-checkin-form');
 
-    // Function to start scanning once video is ready
+    // Function to start scanning
     function startScanning() {
         if (video.readyState === video.HAVE_ENOUGH_DATA && video.videoWidth > 0 && video.videoHeight > 0) {
             canvas.width = video.videoWidth;
@@ -42,24 +57,29 @@
     // QR code scanning function
     function scanQRCode() {
         if (video.videoWidth === 0 || video.videoHeight === 0) {
-            status.textContent = 'Video feed not available. Please check your webcam or use manual check-in.';
+            updateStatus('danger', 'Video feed unavailable. Please check your webcam.');
             return;
         }
 
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const code = jsQR(imageData.data, imageData.width, imageData.height);
+        try {
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const code = jsQR(imageData.data, imageData.width, imageData.height);
 
-        if (code) {
-            status.textContent = 'QR code detected, processing...';
-            checkIn(code.data);
-        } else {
-            requestAnimationFrame(scanQRCode);
+            if (code) {
+                checkIn(code.data, true);
+            } else {
+                requestAnimationFrame(scanQRCode);
+            }
+        } catch (e) {
+            updateStatus('danger', 'Error scanning QR code: ' + e.message);
+            setTimeout(() => requestAnimationFrame(scanQRCode), 2000);
         }
     }
 
-    // Function to handle check-in (used by both QR and manual)
-    function checkIn(studentId) {
+    // Function to handle check-in (QR or manual)
+    function checkIn(studentId, isQR) {
+        updateStatus('info', 'Processing check-in for ' + studentId + '...');
         fetch('/qr-check-in/', {
             method: 'POST',
             headers: {
@@ -70,17 +90,45 @@
         })
         .then(response => response.json())
         .then(data => {
-            status.textContent = data.message;
             if (data.status === 'success') {
-                setTimeout(() => location.reload(), 2000);
+                updateStatus('success', data.message);
+                if (isQR) {
+                    // Resume scanning after 3 seconds for QR scans
+                    setTimeout(() => {
+                        updateStatus('info', 'Ready to scan next QR code.');
+                        requestAnimationFrame(scanQRCode);
+                    }, 3000);
+                } else {
+                    // Clear manual form
+                    manualForm.reset();
+                    updateStatus('info', 'Ready for next check-in.');
+                }
             } else {
-                requestAnimationFrame(scanQRCode); // Resume scanning
+                updateStatus('danger', data.message);
+                if (isQR) {
+                    // Resume scanning after 3 seconds
+                    setTimeout(() => {
+                        updateStatus('info', 'Ready to scan next QR code.');
+                        requestAnimationFrame(scanQRCode);
+                    }, 3000);
+                }
             }
         })
         .catch(err => {
-            status.textContent = 'Error: ' + err;
-            requestAnimationFrame(scanQRCode);
+            updateStatus('danger', 'Network error: ' + err.message);
+            if (isQR) {
+                setTimeout(() => {
+                    updateStatus('info', 'Ready to scan next QR code.');
+                    requestAnimationFrame(scanQRCode);
+                }, 3000);
+            }
         });
+    }
+
+    // Update status with Bootstrap alert classes
+    function updateStatus(type, message) {
+        status.className = `alert alert-${type} mt-3`;
+        status.textContent = message;
     }
 
     // Access webcam
@@ -88,13 +136,12 @@
         .then(stream => {
             video.srcObject = stream;
             video.play();
-            status.textContent = 'Webcam initialized, please show your QR code.';
+            updateStatus('info', 'Webcam ready. Please show a QR code.');
             startScanning();
         })
         .catch(err => {
-            status.textContent = 'Error accessing webcam: ' + err.message + '. Use manual check-in below.';
-            console.error(err);
-            video.style.display = 'none'; // Hide video if webcam fails
+            updateStatus('danger', 'Cannot access webcam: ' + err.message + '. Use manual check-in.');
+            video.style.display = 'none';
         });
 
     // Manual check-in form submission
@@ -102,10 +149,9 @@
         e.preventDefault();
         const studentId = document.getElementById('student_id').value.trim();
         if (studentId) {
-            status.textContent = 'Processing manual check-in...';
-            checkIn(studentId);
+            checkIn(studentId, false);
         } else {
-            status.textContent = 'Please enter a student ID.';
+            updateStatus('danger', 'Please enter a student ID.');
         }
     });
 </script>
