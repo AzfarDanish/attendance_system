@@ -1,0 +1,39 @@
+{% extends 'attendance/dashboard_base.html' %}
+
+{% block dashboard_content %}
+<div class="container">
+    <h2 class="text-center mb-4">Attendance Logs</h2>
+    {% if attendance_logs %}
+        <table class="table table-bordered table-hover">
+            <thead class="thead-light">
+                <tr>
+                    <th>Student ID</th>
+                    <th>Student Name</th>
+                    <th>Class</th>
+                    <th>Date</th>
+                    <th>Check-In Time</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for log in attendance_logs %}
+                    <tr>
+                        <td>{{ log.student.id }}</td>
+                        <td>{{ log.student.name }}</td>
+                        <td>{{ log.student.school_class.name }}</td>
+                        <td>{{ log.date }}</td>
+                        <td>{{ log.check_in_time }}</td>
+                        <td>
+                            <span class="badge {% if log.status == 'on-time' %}badge-success{% else %}badge-danger{% endif %}">
+                                {{ log.status|capfirst }}
+                            </span>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p class="text-center">No attendance logs found.</p>
+    {% endif %}
+</div>
+{% endblock %}

@@ -66,6 +66,18 @@
     </div>
 </div>
 
+<!-- Quick Actions -->
+<div class="row mt-4">
+    <div class="col-md-12 text-center">
+        <a href="/admin/attendance/student/import-csv/" class="btn btn-light mr-2">
+            <i class="fas fa-file-import mr-1"></i> Import Students
+        </a>
+        <button class="btn btn-light" disabled>
+            <i class="fas fa-file-export mr-1"></i> Generate Report
+        </button>
+    </div>
+</div>
+
 <!-- JSON Data for Charts -->
 {{ daily_attendance_labels|json_script:"daily-attendance-labels" }}
 {{ daily_attendance_data|json_script:"daily-attendance-data" }}

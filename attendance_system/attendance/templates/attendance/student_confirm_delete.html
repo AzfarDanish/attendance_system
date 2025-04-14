@@ -1,0 +1,17 @@
+{% extends 'attendance/dashboard_base.html' %}
+
+{% block dashboard_content %}
+<div class="container">
+    <h2 class="text-center mb-4">Delete Student</h2>
+    <p class="text-center">Are you sure you want to delete <strong>{{ student.name }}</strong> (ID: {{ student.id }})?</p>
+    <form method="post" class="text-center">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-light mr-2">
+            <i class="fas fa-trash mr-1"></i> Yes, Delete
+        </button>
+        <a href="{% url 'student_list' %}" class="btn btn-light">
+            <i class="fas fa-times mr-1"></i> Cancel
+        </a>
+    </form>
+</div>
+{% endblock %}

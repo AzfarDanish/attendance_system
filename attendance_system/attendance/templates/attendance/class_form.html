@@ -1,0 +1,26 @@
+{% extends 'attendance/dashboard_base.html' %}
+
+{% block dashboard_content %}
+<div class="container">
+    <h2 class="text-center mb-4">{% if school_class %}Edit Class{% else %}Add Class{% endif %}</h2>
+    <form method="post">
+        {% csrf_token %}
+        <div class="form-group">
+            <label for="id_name">Class Name</label>
+            {{ form.name }}
+        </div>
+        <div class="form-group">
+            <label for="id_grade">Grade</label>
+            {{ form.grade }}
+        </div>
+        <div class="text-center">
+            <button type="submit" class="btn btn-light mr-2">
+                <i class="fas fa-save mr-1"></i> Save
+            </button>
+            <a href="{% url 'class_list' %}" class="btn btn-light">
+                <i class="fas fa-times mr-1"></i> Cancel
+            </a>
+        </div>
+    </form>
+</div>
+{% endblock %}
