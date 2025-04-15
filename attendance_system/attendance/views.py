@@ -269,44 +269,60 @@ def attendance_log_list(request):
     }
     return render(request, 'attendance/attendance_log_list.html', context)
 
-# QR Check-In View
 @login_required
+@user_passes_test(is_staff_or_superuser)
 def qr_check_in(request):
     if request.method == 'POST':
-        student_id = request.POST.get('student_id')
+        # Check both possible input fields
+        student_id = request.POST.get('student_id') or request.POST.get('student_id_manual')
+        print(f"Received student_id: {student_id}")  # Debug log
+        if not student_id:
+            messages.error(request, 'No student ID provided.')
+            return redirect('qr_check_in')
+
         try:
             student = Student.objects.get(id=student_id)
-            # Check if the student has already checked in today
-            today = timezone.now().date()
-            existing_check_in = Attendance.objects.filter(student=student, date=today).first()
-            if existing_check_in:
-                messages.error(request, f'{student.name} has already checked in today.')
-            else:
-                # Determine status based on time (e.g., late if after 8 AM)
-                now = timezone.now()
-                check_in_time = now.time()
-                late_threshold = timezone.datetime.strptime('08:00', '%H:%M').time()
-                status = 'late' if check_in_time > late_threshold else 'on-time'
-                # Log attendance
-                Attendance.objects.create(
-                    student=student,
-                    date=today,
-                    check_in_time=check_in_time,
-                    status=status
-                )
-                messages.success(request, f'Check-in successful for {student.name} at {check_in_time}. Status: {status}.')
         except Student.DoesNotExist:
-            messages.error(request, 'Student not found. Please check the ID.')
-        context = {
-            'admin_name': request.user.get_full_name() or request.user.username,
-        }
-        return render(request, 'attendance/qr_check_in.html', context)
+            messages.error(request, f'Student with ID {student_id} does not exist.')
+            return redirect('qr_check_in')
+
+        today = timezone.now().date()
+        check_in_time = timezone.now()
+        school_day_start = check_in_time.replace(hour=8, minute=0, second=0, microsecond=0)
+
+        existing_attendance = Attendance.objects.filter(
+            student=student,
+            date=today
+        ).first()
+
+        if existing_attendance:
+            messages.warning(request, f'{student.name} has already checked in today.')
+            return redirect('qr_check_in')
+
+        status = 'on-time' if check_in_time <= school_day_start else 'late'
+
+        Attendance.objects.create(
+            student=student,
+            date=today,
+            check_in_time=check_in_time,
+            status=status
+        )
+
+        AdminActionLog.objects.create(
+            admin=request.user,
+            action=f'Checked in student {student.id} ({student.name})',
+            timestamp=check_in_time
+        )
+
+        messages.success(request, f'Check-in successful for {student.name} at {check_in_time.strftime("%H:%M:%S")}. Status: {status}.')
+        return redirect('qr_check_in')
 
     context = {
         'admin_name': request.user.get_full_name() or request.user.username,
     }
     return render(request, 'attendance/qr_check_in.html', context)
 
+# Helper function to generate a unique student ID
 def generate_student_id(existing_ids):
     last_student = Student.objects.order_by('-id').first()
     last_id_number = 0
