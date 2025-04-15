@@ -9,6 +9,12 @@ from django.utils import timezone
 from .forms import StudentForm, SchoolClassForm
 import json
 from datetime import timedelta
+import csv
+from io import TextIOWrapper
+import qrcode
+import base64
+from io import BytesIO
+from django.db.models import Q
 
 # Check if the user is staff or superuser
 def is_staff_or_superuser(user):
@@ -95,10 +101,49 @@ def dashboard(request):
 @login_required
 @user_passes_test(is_staff_or_superuser)
 def student_list(request):
+    # Get search and filter parameters
+    search_query = request.GET.get('search', '')
+    class_filter = request.GET.get('class', '')
+
+    # Start with all students
     students = Student.objects.all()
+
+    # Apply search filter (by name or ID)
+    if search_query:
+        students = students.filter(
+            Q (name__icontains=search_query) | Q(id__icontains=search_query)
+        )
+
+    # Apply class filter
+    if class_filter:
+        students = students.filter(school_class__id=class_filter)
+
+    # Get all classes for the filter dropdown
+    classes = SchoolClass.objects.all()
+
+    # Generate QR codes for each student
+    students_with_qr = []
+    for student in students:
+        qr = qrcode.QRCode(version=1, box_size=10, border=1)
+        qr.add_data(student.id)
+        qr.make(fit=True)
+        img = qr.make_image(fill_color="black", back_color="white")
+        buffered = BytesIO()
+        img.save(buffered, format="PNG")
+        img_str = base64.b64encode(buffered.getvalue()).decode('utf-8')
+        students_with_qr.append({
+            'id': student.id,
+            'name': student.name,
+            'school_class': student.school_class,
+            'qr_code': img_str,
+        })
+
     context = {
         'admin_name': request.user.get_full_name() or request.user.username,
-        'students': students,
+        'students': students_with_qr,
+        'classes': classes,
+        'search_query': search_query,
+        'class_filter': class_filter,
     }
     return render(request, 'attendance/student_list.html', context)
 
@@ -261,6 +306,119 @@ def qr_check_in(request):
         'admin_name': request.user.get_full_name() or request.user.username,
     }
     return render(request, 'attendance/qr_check_in.html', context)
+
+def generate_student_id(existing_ids):
+    last_student = Student.objects.order_by('-id').first()
+    last_id_number = 0
+    if last_student:
+        last_id_number = max(last_id_number, int(last_student.id.replace('S', '')))
+    for student_id in existing_ids:
+        id_number = int(student_id.replace('S', ''))
+        last_id_number = max(last_id_number, id_number)
+    new_id = last_id_number + 1
+    return f'S{new_id:05d}'
+
+# Student Import View
+@login_required
+@user_passes_test(is_staff_or_superuser)
+def student_import(request):
+    if request.method == 'POST':
+        if 'preview' in request.POST:
+            csv_file = request.FILES.get('csv_file')
+            if not csv_file:
+                messages.error(request, 'No file uploaded. Please select a CSV file.')
+                return redirect('student_import')
+            
+            if not csv_file.name.endswith('.csv'):
+                messages.error(request, 'Invalid file format. Please upload a CSV file.')
+                return redirect('student_import')
+
+            try:
+                text_io = TextIOWrapper(csv_file.file, encoding='utf-8')
+                reader = csv.DictReader(text_io)
+                required_columns = {'name', 'class_name'}
+                if not all(col in reader.fieldnames for col in required_columns):
+                    messages.error(request, 'CSV file must contain "name" and "class_name" columns.')
+                    return redirect('student_import')
+
+                preview_data = []
+                existing_ids = set()
+                for row in reader:
+                    student_name = row['name'].strip()
+                    class_name = row['class_name'].strip()
+                    error = None
+
+                    if not student_name:
+                        error = "Student name cannot be empty."
+                    if not class_name:
+                        error = "Class name cannot be empty."
+                    else:
+                        school_class = SchoolClass.objects.filter(name=class_name).first()
+                        if not school_class:
+                            error = f"School class '{class_name}' does not exist."
+
+                    student_id = generate_student_id(existing_ids)
+                    existing_ids.add(student_id)
+
+                    preview_data.append({
+                        'id': student_id,
+                        'name': student_name,
+                        'class_name': class_name,
+                        'error': error,
+                    })
+
+                context = {
+                    'admin_name': request.user.get_full_name() or request.user.username,
+                    'preview_data': preview_data,
+                }
+                return render(request, 'attendance/student_import.html', context)
+
+            except Exception as e:
+                messages.error(request, f'Error processing CSV file: {str(e)}')
+                return redirect('student_import')
+
+        elif 'confirm' in request.POST:
+            preview_data_json = request.POST.get('preview_data')
+            if not preview_data_json:
+                messages.error(request, 'No preview data found. Please upload the CSV file again.')
+                return redirect('student_import')
+
+            try:
+                preview_data = json.loads(preview_data_json)
+                imported = 0
+                errors = []
+
+                for index, row in enumerate(preview_data, start=2):
+                    if row.get('error'):
+                        errors.append(f"Row {index}: {row['error']}")
+                        continue
+
+                    try:
+                        school_class = SchoolClass.objects.get(name=row['class_name'])
+                        Student.objects.create(
+                            id=row['id'],
+                            name=row['name'],
+                            school_class=school_class,
+                        )
+                        imported += 1
+                    except Exception as e:
+                        errors.append(f"Row {index}: {str(e)}")
+
+                if imported > 0:
+                    messages.success(request, f'Successfully imported {imported} students.')
+                if errors:
+                    for error in errors:
+                        messages.error(request, error)
+                return redirect('student_list')
+
+            except Exception as e:
+                messages.error(request, f'Error during import: {str(e)}')
+                return redirect('student_import')
+
+    context = {
+        'admin_name': request.user.get_full_name() or request.user.username,
+    }
+    return render(request, 'attendance/student_import.html', context)
 
 # Admin Logs View
 @login_required

@@ -8,18 +8,36 @@
             <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
                 {{ message }}
                 <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-                    <span aria-hidden="true">&times;</span>
+                    <span aria-hidden="true">×</span>
                 </button>
             </div>
         {% endfor %}
     {% endif %}
-    <div class="mb-3 text-center">
-        <a href="{% url 'student_add' %}" class="btn btn-light mr-2">
-            <i class="fas fa-plus mr-1"></i> Add Student
-        </a>
-        <a href="/admin/attendance/student/import-csv/" class="btn btn-light">
-            <i class="fas fa-file-import mr-1"></i> Import Students
-        </a>
+    <div class="mb-3">
+        <form method="get" class="form-inline justify-content-center">
+            <div class="form-group mr-2">
+                <input type="text" name="search" class="form-control" placeholder="Search by name or ID" value="{{ search_query }}">
+            </div>
+            <div class="form-group mr-2">
+                <select name="class" class="form-control">
+                    <option value="">All Classes</option>
+                    {% for school_class in classes %}
+                        <option value="{{ school_class.id }}" {% if class_filter == school_class.id|stringformat:"s" %}selected{% endif %}>
+                            {{ school_class.name }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <button type="submit" class="btn btn-light mr-2">
+                <i class="fas fa-search mr-1"></i> Search
+            </button>
+            <a href="{% url 'student_add' %}" class="btn btn-light mr-2">
+                <i class="fas fa-plus mr-1"></i> Add Student
+            </a>
+            <a href="{% url 'student_import' %}" class="btn btn-light">
+                <i class="fas fa-upload mr-1"></i> Import Students
+            </a>
+        </form>
     </div>
     {% if students %}
         <table class="table table-bordered table-hover">
@@ -28,6 +46,7 @@
                     <th>ID</th>
                     <th>Name</th>
                     <th>Class</th>
+                    <th>QR Code</th>
                     <th>Actions</th>
                 </tr>
             </thead>
@@ -37,6 +56,30 @@
                         <td>{{ student.id }}</td>
                         <td>{{ student.name }}</td>
                         <td>{{ student.school_class.name }}</td>
+                        <td>
+                            <a href="#" data-toggle="modal" data-target="#qrModal{{ student.id }}">
+                                <img src="data:image/png;base64,{{ student.qr_code }}" alt="QR Code for {{ student.id }}" style="width: 50px; height: 50px;">
+                            </a>
+                            <!-- Modal -->
+                            <div class="modal fade" id="qrModal{{ student.id }}" tabindex="-1" role="dialog" aria-labelledby="qrModalLabel{{ student.id }}" aria-hidden="true">
+                                <div class="modal-dialog modal-dialog-centered" role="document">
+                                    <div class="modal-content">
+                                        <div class="modal-header">
+                                            <h5 class="modal-title" id="qrModalLabel{{ student.id }}">QR Code for {{ student.name }} ({{ student.id }})</h5>
+                                            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                                <span aria-hidden="true">×</span>
+                                            </button>
+                                        </div>
+                                        <div class="modal-body text-center">
+                                            <img src="data:image/png;base64,{{ student.qr_code }}" alt="QR Code for {{ student.id }}" style="width: 200px; height: 200px;">
+                                        </div>
+                                        <div class="modal-footer">
+                                            <button type="button" class="btn btn-light" data-dismiss="modal">Close</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </td>
                         <td>
                             <a href="{% url 'student_edit' student.id %}" class="btn btn-sm btn-light mr-1">
                                 <i class="fas fa-edit"></i> Edit
